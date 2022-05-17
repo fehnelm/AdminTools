@@ -1,0 +1,83 @@
+#Gathers Users logon Info
+# Author: Mikki Fehnel
+#=======================
+
+
+#NETWORK - Set the log path
+# Example: 
+# Netwok share: \\Mad-Svr1\logs 
+
+$audit = "\\Mad-Svr1\logs"
+
+#User
+#Pulls Network Login ID from Active Directory
+
+$Adobj = ([adsisearcher]"Samaccountname=$env:UserName").findone()
+ 
+
+#COMPUTER
+# Pulls Computer Name, MAC of the current connected Network Adapter and the IP Address
+
+$compName = $env:ComputerName
+
+$mac = (Get-WmiObject Win32_NetworkAdapterConfiguration | where {$_.ipenabled -EQ $true}).Macaddress | select-object -first 1
+
+$HostIP = (
+
+    Get-NetIPConfiguration |
+
+    Where-Object {
+
+        $_.IPv4DefaultGateway -ne $null -and
+
+        $_.NetAdapter.Status -ne "Disconnected"
+
+    }
+
+).IPv4Address.IPAddress
+
+$serialNumber = (Get-WmiObject win32_bios).SerialNumber
+
+$osName = (Get-WmiObject Win32_OperatingSystem).Name
+
+$osVersion = (Get-WmiObject Win32_OperatingSystem).Version
+ 
+
+#Date & Time
+# Gets current date and time cna formats to a readable version
+
+$Date = Get-Date -Format "MM/dd/yyy"
+
+$Time = Get-Date -Format "%h:mm:ss tt"
+
+#Write to CVS Log 
+ 
+$logData = @(
+
+[pscustomobject]@{
+
+  Date = $Date
+
+  Time = $Time
+
+  Username = ($Adobj.properties.displayname | Out-String).Trim()
+
+  EDPI = $env:USERNAME
+
+  'Computer Name' = $env:Computername
+
+  'OS Name' = $osName
+
+  'OS Version' = $osVersion
+
+  'MAC Address' = $mac
+
+  'IP Address' = $HostIP
+
+  'Serial Number' = $serialNumber
+
+}
+
+)
+
+$logData |  Export-Csv -Path "$audit\log.csv" -Append -NoTypeInformation
